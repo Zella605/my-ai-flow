@@ -3,22 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Vision Sync 6.0 | 原比例多图版</title>
+    <title>AI Vision Sync 9.0 | 研发闭环版</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 实现瀑布流布局 */
-        .waterfall-grid {
-            column-count: 1;
-            column-gap: 1.5rem;
-        }
-        @media (min-width: 768px) { .waterfall-grid { column-count: 2; } }
-        .waterfall-item {
-            break-inside: avoid;
-            margin-bottom: 1.5rem;
-        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .action-btns { opacity: 0; transition: all 0.2s; }
+        .group:hover .action-btns { opacity: 1; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
@@ -31,147 +25,187 @@
             const [view, setView] = useState('brainstorm');
             const [scrapedData, setScrapedData] = useState([]);
             const [manualData, setManualData] = useState(() => {
-                const saved = localStorage.getItem('zella-v6-manual');
+                const saved = localStorage.getItem('zella-v9-manual');
                 return saved ? JSON.parse(saved) : [];
             });
             const [votes, setVotes] = useState(() => {
-                const saved = localStorage.getItem('zella-v6-votes');
+                const saved = localStorage.getItem('zella-v9-votes');
                 return saved ? JSON.parse(saved) : {};
             });
+            const [deletedIds, setDeletedIds] = useState(() => {
+                const saved = localStorage.getItem('zella-v9-deleted');
+                return saved ? JSON.parse(saved) : [];
+            });
+            
+            // 🚀 新增：研发进度数据
+            const [roadmap, setRoadmap] = useState(() => {
+                const saved = localStorage.getItem('zella-v9-roadmap');
+                return saved ? JSON.parse(saved) : [];
+            });
 
-            // 表单状态：支持多图地址（逗号分隔）
             const [form, setForm] = useState({ url: '', imgs: '', note: '', title: '' });
-            const [loading, setLoading] = useState(true);
 
             useEffect(() => {
                 fetch('./data.json').then(res => res.json()).then(json => {
                     setScrapedData(json);
-                    setLoading(false);
-                }).catch(() => setLoading(false));
+                }).catch(() => console.log("JSON load error"));
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('zella-v6-manual', JSON.stringify(manualData));
-                localStorage.setItem('zella-v6-votes', JSON.stringify(votes));
-            }, [manualData, votes]);
+                localStorage.setItem('zella-v9-manual', JSON.stringify(manualData));
+                localStorage.setItem('zella-v9-votes', JSON.stringify(votes));
+                localStorage.setItem('zella-v9-deleted', JSON.stringify(deletedIds));
+                localStorage.setItem('zella-v9-roadmap', JSON.stringify(roadmap));
+            }, [manualData, votes, deletedIds, roadmap]);
 
-            const handleAddLink = () => {
-                if (!form.url) return;
-                // 将输入的图片地址字符串转为数组
-                const imgArray = form.imgs.split(/[,，\n]/).map(i => i.trim()).filter(i => i);
-                
-                const newIdea = {
-                    id: `manual-${Date.now()}`,
-                    title: form.title || "自定义灵感",
-                    source: "MANUAL",
-                    url: form.url,
-                    images: imgArray.length > 0 ? imgArray : ["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800"],
-                    note: form.note || "未填写说明",
-                    timestamp: Date.now()
+            // 🗑️ 删除逻辑
+            const handleDelete = (id) => {
+                if(!confirm("确定要删除这个灵感吗？")) return;
+                if(id.startsWith('manual-')) {
+                    setManualData(manualData.filter(item => item.id !== id));
+                } else {
+                    setDeletedIds([...deletedIds, id]);
+                }
+            };
+
+            // 🚀 新增：Pick 逻辑（加入研发进度）
+            const handlePick = (item) => {
+                if (roadmap.find(r => r.id === item.id)) {
+                    alert("该灵感已在研发清单中！");
+                    return;
+                }
+                const newTask = {
+                    ...item,
+                    progress: 10, // 初始进度
+                    pickDate: new Date().toLocaleDateString()
                 };
-                setManualData([newIdea, ...manualData]);
-                setForm({ url: '', imgs: '', note: '', title: '' });
+                setRoadmap([newTask, ...roadmap]);
+                alert("已同步至研发进度面板！");
             };
 
             const allIdeas = useMemo(() => {
-                const combined = [...manualData, ...scrapedData.map(d => ({...d, images: [d.imageUrl]}))];
-                return combined.sort((a, b) => (votes[b.id] || 0) - (votes[a.id] || 0));
-            }, [scrapedData, manualData, votes]);
+                const combined = [...manualData, ...scrapedData.map(d => ({...d, images: [d.imageUrl], note: "机器人自动抓取"}))];
+                return combined
+                    .filter(item => !deletedIds.includes(item.id))
+                    .sort((a, b) => (votes[b.id] || 0) - (votes[a.id] || 0));
+            }, [scrapedData, manualData, votes, deletedIds]);
 
             return (
                 <div className="min-h-screen pb-20">
-                    <nav className="bg-white/80 backdrop-blur-xl border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+                    <nav className="bg-white/80 backdrop-blur-md border-b px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <span className="bg-black text-white px-2 py-0.5 rounded font-black text-[10px]">V6.0</span>
-                            <h1 className="font-black tracking-tighter text-slate-800">AI PRO SYNC</h1>
+                            <span className="bg-indigo-600 text-white px-2 py-0.5 rounded font-black text-[10px]">ZELLA PRO</span>
+                            <h1 className="font-black text-slate-800 tracking-tighter uppercase">AI Workflow</h1>
                         </div>
-                        <div className="bg-slate-200/50 rounded-2xl p-1 flex">
-                            <button onClick={() => setView('brainstorm')} className={`px-5 py-1.5 rounded-xl text-xs font-bold transition-all ${view === 'brainstorm' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>灵感看板</button>
-                            <button onClick={() => setView('roadmap')} className={`px-5 py-1.5 rounded-xl text-xs font-bold transition-all ${view === 'roadmap' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>研发进度</button>
+                        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl shadow-inner">
+                            <button onClick={() => setView('brainstorm')} className={`px-6 py-2 rounded-lg text-xs font-black transition-all ${view === 'brainstorm' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>灵感池</button>
+                            <button onClick={() => setView('roadmap')} className={`px-6 py-2 rounded-lg text-xs font-black transition-all ${view === 'roadmap' ? 'bg-white shadow text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>研发进度 ({roadmap.length})</button>
                         </div>
                     </nav>
 
-                    <main className="max-w-6xl mx-auto mt-10 px-4">
+                    <main className="max-w-[1400px] mx-auto mt-8 px-6">
                         {view === 'brainstorm' ? (
-                            <div>
-                                {/* 高级录入面板 */}
-                                <div className="bg-white rounded-[2rem] p-8 mb-12 shadow-sm border border-slate-100">
-                                    <h2 className="font-black text-slate-800 mb-6 flex items-center gap-2 italic">ADD NEW INSPIRATION</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-3">
-                                            <input value={form.title} onChange={e=>setForm({...form, title:e.target.value})} placeholder="灵感标题 (如：2025新春光影特效)" className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all"/>
-                                            <input value={form.url} onChange={e=>setForm({...form, url:e.target.value})} placeholder="灵感链接 (TikTok/小红书...)" className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all"/>
-                                            <textarea value={form.imgs} onChange={e=>setForm({...form, imgs:e.target.value})} placeholder="图片地址 (多张请用逗号或回车分隔)" className="w-full h-24 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all resize-none"/>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <textarea value={form.note} onChange={e=>setForm({...form, note:e.target.value})} placeholder="灵感说明：这为什么值得参考？技术难点在哪？" className="w-full flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all resize-none mb-3"/>
-                                            <button onClick={handleAddLink} className="bg-slate-900 text-white py-4 rounded-xl font-black hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-100">确认入池</button>
-                                        </div>
+                            <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+                                {/* 录入面板 */}
+                                <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl">
+                                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                                        <input value={form.title} onChange={e=>setForm({...form, title:e.target.value})} placeholder="灵感标题" className="bg-white/10 text-white border-none rounded-2xl px-5 py-4 text-sm outline-none focus:ring-2 ring-indigo-500"/>
+                                        <input value={form.url} onChange={e=>setForm({...form, url:e.target.value})} placeholder="参考链接" className="bg-white/10 text-white border-none rounded-2xl px-5 py-4 text-sm outline-none focus:ring-2 ring-indigo-500"/>
+                                        <input value={form.imgs} onChange={e=>setForm({...form, imgs:e.target.value})} placeholder="图片地址(多张逗号隔开)" className="bg-white/10 text-white border-none rounded-2xl px-5 py-4 text-sm outline-none focus:ring-2 ring-indigo-500"/>
+                                        <button onClick={() => {
+                                            const imgArray = form.imgs.split(/[,，\n]/).map(i => i.trim()).filter(i => i);
+                                            const newIdea = { id: `manual-${Date.now()}`, title: form.title || "未命名灵感", source: "MANUAL", url: form.url, images: imgArray.length > 0 ? imgArray : ["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800"], note: form.note || "暂无备注说明" };
+                                            setManualData([newIdea, ...manualData]);
+                                            setForm({ url: '', imgs: '', note: '', title: '' });
+                                        }} className="bg-indigo-500 text-white rounded-2xl font-black text-sm hover:bg-indigo-400 transition-all shadow-lg shadow-indigo-500/20">添加灵感</button>
+                                        <textarea value={form.note} onChange={e=>setForm({...form, note:e.target.value})} placeholder="输入深度说明..." className="lg:col-span-4 bg-white/10 text-white border-none rounded-2xl px-5 py-4 text-sm h-20 outline-none focus:ring-2 ring-indigo-500 resize-none"/>
                                     </div>
                                 </div>
 
-                                {/* 瀑布流展示区 */}
-                                <div className="waterfall-grid">
-                                    {allIdeas.map((item) => (
-                                        <Card key={item.id} item={item} votes={votes[item.id]||0} onVote={() => setVotes(v => ({...v, [item.id]: (v[item.id]||0)+1}))} />
+                                {/* 灵感列表 */}
+                                <div className="space-y-8">
+                                    {allIdeas.map((item, idx) => (
+                                        <div key={item.id} className="group bg-white border border-slate-100 rounded-[3rem] flex flex-col md:flex-row h-auto md:h-[400px] relative overflow-hidden hover:shadow-2xl transition-all border-b-8 border-b-slate-100 hover:border-b-indigo-500">
+                                            
+                                            {/* 操作按钮组 */}
+                                            <div className="action-btns absolute top-6 right-6 z-20 flex gap-2">
+                                                <button onClick={() => handlePick(item)} className="bg-emerald-500 text-white px-4 py-2 rounded-full text-[10px] font-black shadow-lg hover:scale-110 transition-all">PICK 🚀</button>
+                                                <button onClick={() => handleDelete(item.id)} className="bg-rose-100 text-rose-500 p-2 rounded-full hover:bg-rose-500 hover:text-white transition-all shadow-sm">✕</button>
+                                            </div>
+
+                                            {/* 左侧文字区 */}
+                                            <div className="w-full md:w-[340px] p-10 flex flex-col justify-between shrink-0 bg-white border-r border-slate-50">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-6">
+                                                        <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full uppercase tracking-widest">#{idx+1} {item.source}</span>
+                                                    </div>
+                                                    <h3 className="font-black text-2xl text-slate-800 mb-6 leading-tight">{item.title}</h3>
+                                                    <div className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100 shadow-inner">
+                                                        <p className="text-slate-500 text-[11px] font-medium leading-relaxed italic">“{item.note}”</p>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-8 flex items-center justify-between">
+                                                    <a href={item.url} target="_blank" className="text-[10px] font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest">Link ↗</a>
+                                                    <button onClick={() => setVotes(v => ({...v, [item.id]: (v[item.id]||0)+1}))} className="flex items-center gap-2 font-black text-slate-800 text-sm">
+                                                        <span className="text-xl">🔥</span> {votes[item.id] || 0}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* 右侧画廊 */}
+                                            <div className="flex-1 overflow-x-auto hide-scrollbar flex gap-6 p-6 bg-slate-50/30 items-center">
+                                                {item.images.map((img, i) => (
+                                                    <div key={i} className="h-full shrink-0 rounded-[2rem] overflow-hidden shadow-md border-4 border-white">
+                                                        <img src={img} className="h-full w-auto object-contain bg-white" />
+                                                    </div>
+                                                ))}
+                                                <div className="w-10 shrink-0"></div>
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
-                        ) : <div className="text-center py-20 font-black text-slate-200">ROADMAP LOADING...</div>}
-                    </main>
-                </div>
-            );
-        };
-
-        // 独立的卡片组件，处理原比例图片和多图切换
-        const Card = ({ item, votes, onVote }) => {
-            const [activeImgIndex, setActiveImgIndex] = useState(0);
-
-            return (
-                <div className="waterfall-item bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all group border-b-4 border-b-slate-200">
-                    {/* 图片显示区：原比例 */}
-                    <div className="relative bg-slate-100">
-                        <img 
-                            src={item.images[activeImgIndex]} 
-                            className="w-full h-auto block group-hover:brightness-95 transition-all"
-                            loading="lazy"
-                        />
-                        {/* 如果有多图，显示指示条 */}
-                        {item.images.length > 1 && (
-                            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 px-4">
-                                {item.images.map((_, i) => (
-                                    <button 
-                                        key={i} 
-                                        onClick={(e) => { e.preventDefault(); setActiveImgIndex(i); }}
-                                        className={`h-1 rounded-full transition-all ${i === activeImgIndex ? 'w-6 bg-white' : 'w-2 bg-white/40'}`}
-                                    />
-                                ))}
+                        ) : (
+                            <div className="animate-in slide-in-from-right-10 duration-500">
+                                <h2 className="text-4xl font-black text-slate-800 mb-10 tracking-tighter italic">ON-GOING ROADMAP</h2>
+                                {roadmap.length === 0 ? (
+                                    <div className="py-20 text-center bg-white rounded-[3rem] border-4 border-dashed border-slate-200">
+                                        <p className="text-slate-300 font-black text-2xl uppercase">暂无进行中的研发项目</p>
+                                        <button onClick={() => setView('brainstorm')} className="mt-4 text-indigo-500 font-bold hover:underline">前去 Pick 灵感 →</button>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-6">
+                                        {roadmap.map((task) => (
+                                            <div key={task.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center gap-8 group">
+                                                <div className="w-32 h-32 rounded-[2rem] overflow-hidden shrink-0 shadow-inner">
+                                                    <img src={task.images[0]} className="w-full h-full object-cover" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <h3 className="font-black text-xl text-slate-800">{task.title}</h3>
+                                                        <span className="text-xs font-mono text-slate-400">PICKED AT: {task.pickDate}</span>
+                                                    </div>
+                                                    {/* 模拟进度条 */}
+                                                    <div className="w-full bg-slate-100 h-6 rounded-full overflow-hidden p-1 shadow-inner">
+                                                        <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000 shadow-lg shadow-emerald-200" style={{width: `${task.progress}%`}}></div>
+                                                    </div>
+                                                    <div className="flex justify-between mt-2">
+                                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">Status: In Progress</span>
+                                                        <button 
+                                                            onClick={() => setRoadmap(roadmap.filter(r => r.id !== task.id))}
+                                                            className="text-[10px] font-black text-rose-400 hover:text-rose-600 uppercase"
+                                                        >
+                                                            移除项目
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
-                    </div>
-
-                    <div className="p-5">
-                        <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-black text-slate-800 leading-tight flex-1 mr-4">{item.title}</h4>
-                            <span className="text-[10px] font-black bg-slate-100 px-2 py-0.5 rounded text-slate-400">{item.source}</span>
-                        </div>
-                        
-                        <div className="bg-indigo-50/50 p-4 rounded-2xl mb-4 border border-indigo-100/20">
-                            <p className="text-slate-600 text-[11px] font-medium leading-relaxed italic">
-                                “ {item.note} ”
-                            </p>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <a href={item.url} target="_blank" className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter hover:underline">查看源码 ↗</a>
-                            <button 
-                                onClick={onVote}
-                                className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-black flex items-center gap-2 active:scale-95 transition-all"
-                            >
-                                🔥 {votes}
-                            </button>
-                        </div>
-                    </div>
+                    </main>
                 </div>
             );
         };
