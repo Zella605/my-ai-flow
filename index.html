@@ -1,82 +1,38 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Vision Sync 3.6 | 自动竞榜版</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-50 text-slate-900 font-sans">
-    <div id="root"></div>
+name: Auto AI Scraper
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天凌晨自动运行
+  workflow_dispatch: # 支持手动点击按钮触发
 
-        const App = () => {
-            const [view, setView] = useState('brainstorm');
-            const [ideas, setIdeas] = useState([]);
-            const [votes, setVotes] = useState(() => {
-                const saved = localStorage.getItem('ai-flow-votes-v3.6');
-                return saved ? JSON.parse(saved) : {};
-            });
-            const [loading, setLoading] = useState(true);
+permissions:
+  contents: write # 必须赋予写入权限，否则机器人无法更新 data.json
 
-            useEffect(() => {
-                fetch('./data.json')
-                    .then(res => res.json())
-                    .then(json => {
-                        setIdeas(json.map(item => ({
-                            ...item,
-                            status: item.status || 'pending',
-                            type: item.type || 'hotspot'
-                        })));
-                        setLoading(false);
-                    })
-                    .catch(err => {
-                        console.error("Data load failed", err);
-                        setLoading(false);
-                    });
-            }, []);
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-            useEffect(() => {
-                localStorage.setItem('ai-flow-votes-v3.6', JSON.stringify(votes));
-            }, [votes]);
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-            // 🗳️ 投票逻辑
-            const handleVote = (id, e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setVotes(prev => ({
-                    ...prev,
-                    [id]: (prev[id] || 0) + 1
-                }));
-            };
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-            const toggleApprove = (id, e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIdeas(ideas.map(i => i.id === id ? { ...i, status: i.status === 'approved' ? 'pending' : 'approved' } : i));
-            };
+      - name: Install dependencies
+        run: pip install requests
 
-            // 🚀 核心逻辑：根据投票数进行自动排序
-            const sortedIdeas = useMemo(() => {
-                return [...ideas].sort((a, b) => {
-                    const votesA = votes[a.id] || 0;
-                    const votesB = votes[b.id] || 0;
-                    // 如果票数相同，则保持原始抓取顺序
-                    return votesB - votesA;
-                });
-            }, [ideas, votes]);
+      - name: Run scraper
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }} # 关键：从保险箱读取 Key
+        run: python scraper.py
 
-            const maxVotes = Math.max(...Object.values(votes), 0);
-            const dailyItems = ideas.filter(i => i.status === 'approved' && i.type === 'longterm');
-            const hotItems = ideas.filter(i => i.status === 'approved' && i.type === 'hotspot');
-
-            return (
-                <div className="min-h-screen pb-10">
-                    <nav className="bg-white/90 backdrop-blur-md border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-indigo-600 text-white p-1 rounded font-black text-[10px] w-12 text-center
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "Zella-Bot"
+          git config --global user.email "bot@zella.com"
+          git add data.json
+          git commit -m "🤖 Bot: Update real AI trends from TikTok" || exit 0
+          git push
