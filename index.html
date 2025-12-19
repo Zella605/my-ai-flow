@@ -3,11 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Vision Sync 5.0 | 深度灵感站</title>
+    <title>AI Vision Sync 6.0 | 原比例多图版</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 实现瀑布流布局 */
+        .waterfall-grid {
+            column-count: 1;
+            column-gap: 1.5rem;
+        }
+        @media (min-width: 768px) { .waterfall-grid { column-count: 2; } }
+        .waterfall-item {
+            break-inside: avoid;
+            margin-bottom: 1.5rem;
+        }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans">
     <div id="root"></div>
@@ -19,16 +31,16 @@
             const [view, setView] = useState('brainstorm');
             const [scrapedData, setScrapedData] = useState([]);
             const [manualData, setManualData] = useState(() => {
-                const saved = localStorage.getItem('zella-manual-v5');
+                const saved = localStorage.getItem('zella-v6-manual');
                 return saved ? JSON.parse(saved) : [];
             });
             const [votes, setVotes] = useState(() => {
-                const saved = localStorage.getItem('zella-votes-v5');
+                const saved = localStorage.getItem('zella-v6-votes');
                 return saved ? JSON.parse(saved) : {};
             });
 
-            // 手动上传表单状态
-            const [form, setForm] = useState({ url: '', img: '', note: '' });
+            // 表单状态：支持多图地址（逗号分隔）
+            const [form, setForm] = useState({ url: '', imgs: '', note: '', title: '' });
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
@@ -39,134 +51,127 @@
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('zella-manual-v5', JSON.stringify(manualData));
-                localStorage.setItem('zella-votes-v5', JSON.stringify(votes));
+                localStorage.setItem('zella-v6-manual', JSON.stringify(manualData));
+                localStorage.setItem('zella-v6-votes', JSON.stringify(votes));
             }, [manualData, votes]);
 
             const handleAddLink = () => {
                 if (!form.url) return;
+                // 将输入的图片地址字符串转为数组
+                const imgArray = form.imgs.split(/[,，\n]/).map(i => i.trim()).filter(i => i);
+                
                 const newIdea = {
                     id: `manual-${Date.now()}`,
-                    title: `手动捕获灵感`,
-                    likes: "NEW",
+                    title: form.title || "自定义灵感",
                     source: "MANUAL",
                     url: form.url,
-                    imageUrl: form.img || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400",
-                    note: form.note || "暂无深度说明",
-                    status: 'pending'
+                    images: imgArray.length > 0 ? imgArray : ["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800"],
+                    note: form.note || "未填写说明",
+                    timestamp: Date.now()
                 };
                 setManualData([newIdea, ...manualData]);
-                setForm({ url: '', img: '', note: '' });
-            };
-
-            const handleVote = (id) => {
-                setVotes(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+                setForm({ url: '', imgs: '', note: '', title: '' });
             };
 
             const allIdeas = useMemo(() => {
-                return [...manualData, ...scrapedData].sort((a, b) => (votes[b.id] || 0) - (votes[a.id] || 0));
+                const combined = [...manualData, ...scrapedData.map(d => ({...d, images: [d.imageUrl]}))];
+                return combined.sort((a, b) => (votes[b.id] || 0) - (votes[a.id] || 0));
             }, [scrapedData, manualData, votes]);
 
             return (
                 <div className="min-h-screen pb-20">
-                    <nav className="bg-white/80 backdrop-blur-xl border-b px-8 py-4 flex justify-between items-center sticky top-0 z-50">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-indigo-600 text-white px-2 py-1 rounded-lg font-black text-xs shadow-lg shadow-indigo-200">ZELLA v5</div>
-                            <h1 className="font-black text-slate-800 tracking-tighter uppercase">AI Vision Sync</h1>
+                    <nav className="bg-white/80 backdrop-blur-xl border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+                        <div className="flex items-center gap-2">
+                            <span className="bg-black text-white px-2 py-0.5 rounded font-black text-[10px]">V6.0</span>
+                            <h1 className="font-black tracking-tighter text-slate-800">AI PRO SYNC</h1>
                         </div>
-                        <div className="bg-slate-100 rounded-2xl p-1 flex">
-                            <button onClick={() => setView('brainstorm')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${view === 'brainstorm' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>灵感池</button>
-                            <button onClick={() => setView('roadmap')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${view === 'roadmap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>排期看板</button>
+                        <div className="bg-slate-200/50 rounded-2xl p-1 flex">
+                            <button onClick={() => setView('brainstorm')} className={`px-5 py-1.5 rounded-xl text-xs font-bold transition-all ${view === 'brainstorm' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>灵感看板</button>
+                            <button onClick={() => setView('roadmap')} className={`px-5 py-1.5 rounded-xl text-xs font-bold transition-all ${view === 'roadmap' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}>研发进度</button>
                         </div>
                     </nav>
 
-                    <main className="max-w-5xl mx-auto mt-10 px-6">
+                    <main className="max-w-6xl mx-auto mt-10 px-4">
                         {view === 'brainstorm' ? (
-                            <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
-                                
-                                {/* 深度上传表单 */}
-                                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 mb-12 shadow-sm relative overflow-hidden">
-                                    <h3 className="font-black text-slate-800 text-lg mb-6 flex items-center gap-2">
-                                        <span className="text-2xl text-indigo-500">+</span> 新增深度灵感录入
-                                    </h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-4">
-                                            <input 
-                                                value={form.url} 
-                                                onChange={e => setForm({...form, url: e.target.value})}
-                                                placeholder="粘贴原始链接 (TikTok/小红书...)"
-                                                className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm focus:ring-2 ring-indigo-500 transition-all"
-                                            />
-                                            <input 
-                                                value={form.img} 
-                                                onChange={e => setForm({...form, img: e.target.value})}
-                                                placeholder="图片地址 (可右键复制网页图片地址)"
-                                                className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm focus:ring-2 ring-indigo-500 transition-all"
-                                            />
+                            <div>
+                                {/* 高级录入面板 */}
+                                <div className="bg-white rounded-[2rem] p-8 mb-12 shadow-sm border border-slate-100">
+                                    <h2 className="font-black text-slate-800 mb-6 flex items-center gap-2 italic">ADD NEW INSPIRATION</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-3">
+                                            <input value={form.title} onChange={e=>setForm({...form, title:e.target.value})} placeholder="灵感标题 (如：2025新春光影特效)" className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all"/>
+                                            <input value={form.url} onChange={e=>setForm({...form, url:e.target.value})} placeholder="灵感链接 (TikTok/小红书...)" className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all"/>
+                                            <textarea value={form.imgs} onChange={e=>setForm({...form, imgs:e.target.value})} placeholder="图片地址 (多张请用逗号或回车分隔)" className="w-full h-24 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all resize-none"/>
                                         </div>
-                                        <div className="space-y-4">
-                                            <textarea 
-                                                value={form.note} 
-                                                onChange={e => setForm({...form, note: e.target.value})}
-                                                placeholder="在此输入灵感说明：例如「粒子消散特效，适合美妆类目」"
-                                                className="w-full h-full min-h-[110px] bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm focus:ring-2 ring-indigo-500 transition-all resize-none"
-                                            />
+                                        <div className="flex flex-col">
+                                            <textarea value={form.note} onChange={e=>setForm({...form, note:e.target.value})} placeholder="灵感说明：这为什么值得参考？技术难点在哪？" className="w-full flex-1 bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 ring-indigo-500/20 transition-all resize-none mb-3"/>
+                                            <button onClick={handleAddLink} className="bg-slate-900 text-white py-4 rounded-xl font-black hover:bg-indigo-600 transition-all shadow-lg shadow-indigo-100">确认入池</button>
                                         </div>
                                     </div>
-                                    <button 
-                                        onClick={handleAddLink}
-                                        className="w-full mt-6 bg-slate-900 text-white py-4 rounded-2xl font-black text-sm hover:bg-indigo-600 transition-all active:scale-[0.98] shadow-xl shadow-slate-200"
-                                    >
-                                        提交并同步至灵感池
-                                    </button>
                                 </div>
 
-                                {/* 卡片瀑布流 */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {allIdeas.map((item, index) => (
-                                        <div key={item.id} className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden hover:shadow-2xl transition-all group flex flex-col shadow-sm border-b-4 border-b-slate-200 hover:border-b-indigo-500">
-                                            {/* 图片封面 */}
-                                            <div className="h-64 overflow-hidden relative">
-                                                <img src={item.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                                                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm text-[9px] font-black uppercase tracking-widest">
-                                                    #{index + 1} {item.source}
-                                                </div>
-                                                <a href={item.url} target="_blank" className="absolute top-4 right-4 bg-black/50 hover:bg-black text-white p-2 rounded-full backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    ↗
-                                                </a>
-                                            </div>
-
-                                            {/* 内容区 */}
-                                            <div className="p-6 flex-1 flex flex-col justify-between">
-                                                <div>
-                                                    <h4 className="font-black text-slate-800 text-lg mb-2 line-clamp-1">{item.title}</h4>
-                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-4">
-                                                        <p className="text-slate-500 text-xs font-bold leading-relaxed italic">
-                                                            “ {item.note || "该灵感目前由机器人自动抓取，暂无深度说明内容。"} ”
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="flex justify-between items-center mt-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-rose-500 text-xs font-black tracking-tighter">LIKES: {item.likes}</span>
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => handleVote(item.id)}
-                                                        className="bg-indigo-50 text-indigo-600 px-6 py-2.5 rounded-xl font-black text-xs hover:bg-indigo-600 hover:text-white transition-all active:scale-90 flex items-center gap-2"
-                                                    >
-                                                        🔥 投一票 <span className="bg-white/20 px-1.5 rounded">{votes[item.id] || 0}</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                {/* 瀑布流展示区 */}
+                                <div className="waterfall-grid">
+                                    {allIdeas.map((item) => (
+                                        <Card key={item.id} item={item} votes={votes[item.id]||0} onVote={() => setVotes(v => ({...v, [item.id]: (v[item.id]||0)+1}))} />
                                     ))}
                                 </div>
                             </div>
-                        ) : (
-                            <div className="text-center py-40 font-black text-slate-200 text-6xl italic uppercase opacity-20 select-none">Under Construction</div>
-                        )}
+                        ) : <div className="text-center py-20 font-black text-slate-200">ROADMAP LOADING...</div>}
                     </main>
+                </div>
+            );
+        };
+
+        // 独立的卡片组件，处理原比例图片和多图切换
+        const Card = ({ item, votes, onVote }) => {
+            const [activeImgIndex, setActiveImgIndex] = useState(0);
+
+            return (
+                <div className="waterfall-item bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all group border-b-4 border-b-slate-200">
+                    {/* 图片显示区：原比例 */}
+                    <div className="relative bg-slate-100">
+                        <img 
+                            src={item.images[activeImgIndex]} 
+                            className="w-full h-auto block group-hover:brightness-95 transition-all"
+                            loading="lazy"
+                        />
+                        {/* 如果有多图，显示指示条 */}
+                        {item.images.length > 1 && (
+                            <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 px-4">
+                                {item.images.map((_, i) => (
+                                    <button 
+                                        key={i} 
+                                        onClick={(e) => { e.preventDefault(); setActiveImgIndex(i); }}
+                                        className={`h-1 rounded-full transition-all ${i === activeImgIndex ? 'w-6 bg-white' : 'w-2 bg-white/40'}`}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-5">
+                        <div className="flex justify-between items-start mb-3">
+                            <h4 className="font-black text-slate-800 leading-tight flex-1 mr-4">{item.title}</h4>
+                            <span className="text-[10px] font-black bg-slate-100 px-2 py-0.5 rounded text-slate-400">{item.source}</span>
+                        </div>
+                        
+                        <div className="bg-indigo-50/50 p-4 rounded-2xl mb-4 border border-indigo-100/20">
+                            <p className="text-slate-600 text-[11px] font-medium leading-relaxed italic">
+                                “ {item.note} ”
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <a href={item.url} target="_blank" className="text-[10px] font-black text-indigo-500 uppercase tracking-tighter hover:underline">查看源码 ↗</a>
+                            <button 
+                                onClick={onVote}
+                                className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-black flex items-center gap-2 active:scale-95 transition-all"
+                            >
+                                🔥 {votes}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             );
         };
