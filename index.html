@@ -1,38 +1,201 @@
-name: Auto AI Scraper
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Vision Sync 3.6 | 自动竞榜版</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans">
+    <div id="root"></div>
 
-on:
-  schedule:
-    - cron: '0 0 * * *' # 每天凌晨自动运行
-  workflow_dispatch: # 支持手动点击按钮触发
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-permissions:
-  contents: write # 必须赋予写入权限，否则机器人无法更新 data.json
+        const App = () => {
+            const [view, setView] = useState('brainstorm');
+            const [ideas, setIdeas] = useState([]);
+            const [votes, setVotes] = useState(() => {
+                const saved = localStorage.getItem('ai-flow-votes-v3.6');
+                return saved ? JSON.parse(saved) : {};
+            });
+            const [loading, setLoading] = useState(true);
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+            useEffect(() => {
+                fetch('./data.json')
+                    .then(res => res.json())
+                    .then(json => {
+                        setIdeas(json.map(item => ({
+                            ...item,
+                            status: item.status || 'pending',
+                            type: item.type || 'hotspot'
+                        })));
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error("Data load failed", err);
+                        setLoading(false);
+                    });
+            }, []);
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+            useEffect(() => {
+                localStorage.setItem('ai-flow-votes-v3.6', JSON.stringify(votes));
+            }, [votes]);
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+            // 🗳️ 投票逻辑
+            const handleVote = (id, e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setVotes(prev => ({
+                    ...prev,
+                    [id]: (prev[id] || 0) + 1
+                }));
+            };
 
-      - name: Install dependencies
-        run: pip install requests
+            const toggleApprove = (id, e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIdeas(ideas.map(i => i.id === id ? { ...i, status: i.status === 'approved' ? 'pending' : 'approved' } : i));
+            };
 
-      - name: Run scraper
-        env:
-          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }} # 关键：从保险箱读取 Key
-        run: python scraper.py
+            // 🚀 核心逻辑：根据投票数进行自动排序
+            const sortedIdeas = useMemo(() => {
+                return [...ideas].sort((a, b) => {
+                    const votesA = votes[a.id] || 0;
+                    const votesB = votes[b.id] || 0;
+                    // 如果票数相同，则保持原始抓取顺序
+                    return votesB - votesA;
+                });
+            }, [ideas, votes]);
 
-      - name: Commit and Push changes
-        run: |
-          git config --global user.name "Zella-Bot"
-          git config --global user.email "bot@zella.com"
-          git add data.json
-          git commit -m "🤖 Bot: Update real AI trends from TikTok" || exit 0
-          git push
+            const maxVotes = Math.max(...Object.values(votes), 0);
+            const dailyItems = ideas.filter(i => i.status === 'approved' && i.type === 'longterm');
+            const hotItems = ideas.filter(i => i.status === 'approved' && i.type === 'hotspot');
+
+            return (
+                <div className="min-h-screen pb-10">
+                    <nav className="bg-white/90 backdrop-blur-md border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-indigo-600 text-white p-1 rounded font-black text-[10px] w-12 text-center shadow-lg shadow-indigo-100">AI</div>
+                            <span className="font-black text-slate-800 tracking-tighter uppercase text-sm">Vision Sync 3.6</span>
+                        </div>
+                        <div className="bg-slate-100 rounded-full p-1 flex">
+                            <button onClick={() => setView('brainstorm')} className={`px-6 py-1.5 rounded-full text-[11px] font-black transition-all ${view === 'brainstorm' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>热力灵感池</button>
+                            <button onClick={() => setView('roadmap')} className={`px-6 py-1.5 rounded-full text-[11px] font-black transition-all ${view === 'roadmap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>执行看板</button>
+                        </div>
+                    </nav>
+
+                    <main className="max-w-4xl mx-auto mt-8 px-4">
+                        {view === 'brainstorm' ? (
+                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                <div className="mb-8 flex justify-between items-end">
+                                    <div>
+                                        <h2 className="font-black text-3xl text-slate-900 tracking-tight flex items-center gap-2">
+                                            Trending Ideas <span className="animate-bounce">🚀</span>
+                                        </h2>
+                                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">投票最高项已自动置顶，决定我们的研发优先级</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {loading ? (
+                                        <div className="py-20 text-center text-slate-300 font-black italic animate-pulse tracking-widest uppercase">Sorting by Popularity...</div>
+                                    ) : sortedIdeas.map((item, index) => {
+                                        const itemVotes = votes[item.id] || 0;
+                                        const isFirst = index === 0 && itemVotes > 0;
+                                        
+                                        return (
+                                            <div key={item.id} className={`bg-white border rounded-[2.5rem] p-4 flex items-center gap-5 transition-all duration-500 group relative ${isFirst ? 'border-indigo-200 ring-8 ring-indigo-50/50 shadow-2xl scale-[1.02] z-10' : 'border-slate-100 shadow-sm'}`}>
+                                                
+                                                {/* 排位序号 */}
+                                                <div className={`absolute -left-3 w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shadow-md border ${isFirst ? 'bg-indigo-600 text-white border-indigo-400' : 'bg-white text-slate-300 border-slate-100'}`}>
+                                                    {index + 1}
+                                                </div>
+
+                                                <a href={item.url} target="_blank" className="w-24 h-24 rounded-3xl overflow-hidden shrink-0 bg-slate-100 block relative">
+                                                    <img src={item.imageUrl || `https://picsum.photos/seed/${item.id}/300/300`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
+                                                        <span className="text-white text-[8px] font-black tracking-widest uppercase">Open ↗</span>
+                                                    </div>
+                                                </a>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-[9px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-black uppercase">{item.source}</span>
+                                                        <h4 className="font-black text-slate-800 truncate text-lg tracking-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
+                                                    </div>
+                                                    <div className="flex items-center gap-3 text-xs font-bold">
+                                                        <span className="text-rose-500 flex items-center gap-1">❤️ <span className="text-slate-400 font-mono text-[10px] uppercase tracking-tighter">Global:</span> {item.likes}</span>
+                                                        <div className="h-1 w-1 bg-slate-200 rounded-full"></div>
+                                                        <span className="text-indigo-600 uppercase tracking-widest text-[10px]">内部投票: {itemVotes}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="shrink-0 flex items-center gap-2">
+                                                    <button 
+                                                        onClick={(e) => handleVote(item.id, e)}
+                                                        className="flex flex-col items-center justify-center w-16 h-16 rounded-[1.5rem] bg-slate-50 text-slate-400 hover:bg-indigo-600 hover:text-white transition-all active:scale-90 group/vote relative overflow-hidden"
+                                                    >
+                                                        <span className="text-xl relative z-10 group-hover/vote:scale-125 transition-transform duration-300">👍</span>
+                                                        <span className="text-[10px] font-black relative z-10 mt-1">{itemVotes}</span>
+                                                        <div className="absolute inset-0 bg-indigo-500 opacity-0 group-hover/vote:opacity-100 transition-opacity"></div>
+                                                    </button>
+
+                                                    <button 
+                                                        onClick={(e) => toggleApprove(item.id, e)}
+                                                        className={`h-16 px-6 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${item.status === 'approved' ? 'bg-green-500 text-white' : 'bg-slate-900 text-white hover:bg-slate-700 shadow-lg shadow-slate-200'}`}
+                                                    >
+                                                        {item.status === 'approved' ? 'Done' : 'Approve'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="animate-in slide-in-from-right-4 duration-500">
+                                {/* 执行看板逻辑 - 保持精简 */}
+                                <div className="grid grid-cols-2 gap-4 mb-8">
+                                    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Daily Quota</div>
+                                        <div className="text-4xl font-black text-indigo-600">{dailyItems.length}/3</div>
+                                    </div>
+                                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-xl text-center">
+                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Hotspots</div>
+                                        <div className="text-4xl font-black text-orange-400">{hotItems.length}</div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+                                    <div className="p-6 border-b font-black text-slate-800 text-sm uppercase italic tracking-tighter">Current Pipeline</div>
+                                    <div className="divide-y divide-slate-50">
+                                        {[...dailyItems, ...hotItems].map(item => (
+                                            <div key={item.id} className="p-6 flex justify-between items-center group hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="text-xs font-black text-indigo-600 w-8">#{votes[item.id] || 0}</div>
+                                                    <span className="font-bold text-slate-800">{item.title}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase">In Production</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
