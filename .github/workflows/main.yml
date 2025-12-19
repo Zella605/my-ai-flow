@@ -1,24 +1,38 @@
 name: Auto AI Scraper
+
 on:
   schedule:
-    - cron: '0 0 * * *' # 每天凌晨运行
-  workflow_dispatch: # 允许你手动点击运行
+    - cron: '0 0 * * *' # 每天凌晨自动运行
+  workflow_dispatch: # 支持手动点击按钮触发
+
+permissions:
+  contents: write # 必须赋予写入权限，否则机器人无法更新 data.json
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests
+
       - name: Run scraper
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }} # 关键：从保险箱读取 Key
         run: python scraper.py
-      - name: Commit files
+
+      - name: Commit and Push changes
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add .
-          git commit -m "🤖 自动抓取最新 AI 热点" || exit 0
+          git config --global user.name "Zella-Bot"
+          git config --global user.email "bot@zella.com"
+          git add data.json
+          git commit -m "🤖 Bot: Update real AI trends from TikTok" || exit 0
           git push
