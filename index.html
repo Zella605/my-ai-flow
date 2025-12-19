@@ -2,188 +2,79 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Flow 3.0 - 自动化集成 Demo</title>
+    <title>AI Vision Sync | Zella</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-50">
+<body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
-
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // 模拟爬虫抓取到的初始数据
-        const MOCK_SCRAPED_DATA = [
-            { id: 'sc-1', title: 'AI 扩图新特效 (高赞)', url: 'https://v.douyin.com/example1', type: 'hotspot', likes: '15.2w', source: '抖音机器人', status: 'pending' },
-            { id: 'sc-2', title: 'Old Money 风格滤镜', url: 'https://instagr.am/p/example2', type: 'hotspot', likes: '89k', source: 'Ins 机器人', status: 'pending' }
-        ];
-
         const App = () => {
-            const [view, setView] = useState('brainstorm');
-            const [ideas, setIdeas] = useState(() => {
-                const saved = localStorage.getItem('ab-flow-v3');
-                return saved ? JSON.parse(saved) : MOCK_SCRAPED_DATA;
-            });
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                localStorage.setItem('ab-flow-v3', JSON.stringify(ideas));
-            }, [ideas]);
-
-            // 添加新链接
-            const addLink = (url) => {
-                if(!url) return;
-                const newIdea = {
-                    id: Date.now(),
-                    title: `手动捕获: ${url.substring(0, 20)}...`,
-                    url: url,
-                    type: url.includes('docs') ? 'longterm' : 'hotspot',
-                    source: '手动上传',
-                    status: 'pending'
-                };
-                setIdeas([newIdea, ...ideas]);
-            };
-
-            const toggleApprove = (id) => {
-                setIdeas(ideas.map(i => i.id === id ? { ...i, status: i.status === 'approved' ? 'pending' : 'approved' } : i));
-            };
-
-            const dailyItems = ideas.filter(i => i.status === 'approved' && i.type === 'longterm');
-            const hotItems = ideas.filter(i => i.status === 'approved' && i.type === 'hotspot');
+                fetch('./data.json')
+                    .then(res => res.json())
+                    .then(json => {
+                        setData(json);
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error("数据加载失败:", err);
+                        setLoading(false);
+                    });
+            }, []);
 
             return (
-                <div className="min-h-screen pb-10">
-                    <nav className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50">
-                        <div className="flex items-center gap-2">
-                            <span className="bg-blue-600 text-white p-1 rounded font-bold text-xs uppercase">AI Flow</span>
-                            <span className="font-black text-slate-800 tracking-tight">2025 效果落地闭环</span>
+                <div className="min-h-screen p-8">
+                    <header className="max-w-4xl mx-auto mb-12 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-4xl font-black tracking-tighter text-blue-600">AI VISION SYNC</h1>
+                            <p className="text-slate-400 font-medium uppercase text-xs tracking-widest mt-1">Zella's Automated Trend Intelligence</p>
                         </div>
-                        <div className="bg-slate-100 rounded-full p-1 flex">
-                            <button onClick={() => setView('brainstorm')} className={`px-6 py-1.5 rounded-full text-xs font-bold transition ${view === 'brainstorm' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>灵感库</button>
-                            <button onClick={() => setView('roadmap')} className={`px-6 py-1.5 rounded-full text-xs font-bold transition ${view === 'roadmap' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>排期表</button>
+                        <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border text-[10px] font-bold">
+                            STATUS: <span className="text-green-500 underline animate-pulse">LIVE</span>
                         </div>
-                    </nav>
+                    </header>
 
-                    <main className="max-w-5xl mx-auto mt-8 px-4">
-                        {view === 'brainstorm' ? (
-                            <div className="animate-in fade-in duration-500">
-                                {/* 顶部上传区 */}
-                                <div className="bg-white rounded-3xl p-6 border shadow-sm mb-10">
-                                    <h2 className="font-bold text-slate-800 mb-4">🔗 快速捕获灵感链接</h2>
-                                    <div className="flex gap-3">
-                                        <input 
-                                            id="urlInput"
-                                            placeholder="粘贴 TikTok, Ins 或内部文档链接..." 
-                                            className="flex-1 bg-slate-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 ring-blue-500 outline-none"
-                                        />
-                                        <button 
-                                            onClick={() => {
-                                                const input = document.getElementById('urlInput');
-                                                addLink(input.value);
-                                                input.value = '';
-                                            }}
-                                            className="bg-slate-900 text-white px-6 rounded-2xl font-bold text-sm hover:bg-blue-600 transition"
-                                        >
-                                            入池
-                                        </button>
-                                    </div>
-                                    <div className="mt-4 flex gap-6">
-                                        <div className="text-[10px] text-slate-400 uppercase font-bold tracking-widest flex items-center gap-1">
-                                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> 机器人正在实时扒取高赞视频...
-                                        </div>
-                                    </div>
-                                </div>
+                    <main className="max-w-4xl mx-auto">
+                        {loading ? (
+                            <div className="text-center py-20 text-slate-300 font-bold italic animate-pulse">CONNECTING TO CLOUD DATA...</div>
+                        ) : data.length > 0 ? (
+                            <div className="grid gap-4">
+                                {data.map((item, index) => (
+                                    <a href={item.url} target="_blank" rel="noopener noreferrer" key={index} 
+                                       className="block bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:scale-[1.01] transition-all flex items-center group">
+                                        
+                                        {item.imageUrl && (
+                                            <div className="w-24 h-24 rounded-2xl overflow-hidden mr-6 shrink-0">
+                                                <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                            </div>
+                                        )}
 
-                                {/* 灵感池列表 */}
-                                <div className="space-y-4">
-                                    <h3 className="font-black text-slate-400 text-xs tracking-widest uppercase mb-4">待处理需求池 ({ideas.length})</h3>
-                                    {ideas.map(item => (
-                                        <div key={item.id} className="bg-white border rounded-3xl p-5 flex items-center justify-between hover:shadow-xl hover:border-blue-200 transition group">
-                                            <div className="flex items-center gap-5 flex-1 overflow-hidden">
-                                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${item.type === 'hotspot' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-500'}`}>
-                                                    {item.type === 'hotspot' ? '🔥' : '📄'}
-                                                </div>
-                                                <div className="overflow-hidden">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="font-bold text-slate-800 truncate">{item.title}</h4>
-                                                        {item.likes && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold">❤️ {item.likes}</span>}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                                                        <span className="font-bold uppercase tracking-tighter text-[9px] bg-slate-100 px-1 rounded">{item.source}</span>
-                                                        <span className="truncate">{item.url}</span>
-                                                    </div>
-                                                </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="bg-slate-900 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">{item.source}</span>
+                                                <h3 className="font-bold text-lg text-slate-800">{item.title}</h3>
                                             </div>
-                                            <div className="flex items-center gap-4 ml-4">
-                                                <button 
-                                                    onClick={() => toggleApprove(item.id)}
-                                                    className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all ${item.status === 'approved' ? 'bg-green-500 text-white shadow-lg shadow-green-100' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
-                                                >
-                                                    {item.status === 'approved' ? '已通过初评' : 'Owner 评审'}
-                                                </button>
-                                            </div>
+                                            <p className="text-xs text-slate-400 font-mono truncate max-w-md">{item.url || 'Internal Data Trace'}</p>
                                         </div>
-                                    ))}
-                                </div>
+                                        <div className="text-right shrink-0 ml-4">
+                                            <div className="text-2xl font-black text-rose-500 italic leading-none">❤️ {item.likes}</div>
+                                            <div className="text-[9px] font-black text-slate-300 uppercase tracking-tighter mt-1">High Impact</div>
+                                        </div>
+                                    </a>
+                                ))}
                             </div>
                         ) : (
-                            <div className="animate-in slide-in-from-right-4 duration-500">
-                                {/* 配额管理卡片 */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                                    <div className="bg-white p-6 rounded-[2rem] border shadow-sm">
-                                        <div className="flex justify-between items-end mb-4">
-                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">日常更新配额</span>
-                                            <span className={`text-3xl font-black ${dailyItems.length >= 3 ? 'text-red-500' : 'text-blue-600'}`}>{dailyItems.length}/3</span>
-                                        </div>
-                                        <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-                                            <div className={`h-full transition-all duration-700 ${dailyItems.length >= 3 ? 'bg-red-500' : 'bg-blue-600'}`} style={{width: `${(dailyItems.length/3)*100}%`}}></div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-tight">注：由「集中长线」路径转入的需求，每月限 3 款效果</p>
-                                    </div>
-
-                                    <div className="bg-slate-900 p-6 rounded-[2rem] text-white shadow-xl shadow-slate-200">
-                                        <div className="flex justify-between items-end mb-4">
-                                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">热点/突击项目</span>
-                                            <span className="text-3xl font-black text-orange-400">{hotItems.length}</span>
-                                        </div>
-                                        <div className="h-3 rounded-full bg-slate-800">
-                                            <div className="h-full w-full bg-gradient-to-r from-orange-400 to-red-500 rounded-full shadow-[0_0_15px_rgba(251,146,60,0.5)]"></div>
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 mt-3 font-bold uppercase tracking-tight italic">频率：随动排期，不确定 :)</p>
-                                    </div>
-                                </div>
-
-                                {/* 落地排期表 */}
-                                <div className="bg-white rounded-[2rem] border overflow-hidden shadow-sm">
-                                    <div className="p-6 border-b bg-slate-50/50 flex justify-between items-center">
-                                        <h3 className="font-black text-slate-800 uppercase tracking-tight text-sm">2025年 1月 落地清单</h3>
-                                        <button className="text-[10px] font-bold bg-white border px-3 py-1.5 rounded-full hover:bg-slate-100 transition">导出对齐简报</button>
-                                    </div>
-                                    <div className="divide-y divide-slate-100">
-                                        {[...dailyItems, ...hotItems].map(item => (
-                                            <div key={item.id} className="p-6 flex justify-between items-center group">
-                                                <div>
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${item.type === 'longterm' ? 'bg-blue-50 text-blue-500' : 'bg-orange-50 text-orange-500'}`}>
-                                                            {item.type === 'longterm' ? '日常更新' : '突击/节点'}
-                                                        </span>
-                                                        <span className="font-bold text-slate-800">{item.title}</span>
-                                                    </div>
-                                                    <div className="text-[10px] text-slate-400 truncate max-w-xs italic">{item.url}</div>
-                                                </div>
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-[10px] font-black text-green-500 uppercase tracking-widest">研发执行中</span>
-                                                    <span className="text-[9px] text-slate-300 font-bold">ETA: 1月30日前</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {dailyItems.length + hotItems.length === 0 && (
-                                            <div className="py-20 text-center text-slate-300 font-black italic uppercase tracking-widest">Empty Roadmap - Need Review</div>
-                                        )}
-                                    </div>
-                                </div>
+                            <div className="bg-white rounded-[3rem] p-20 text-center border-2 border-dashed border-slate-200">
+                                <p className="text-slate-400 font-bold italic mb-4">"灵感池目前是空的"</p>
+                                <p className="text-xs text-slate-300">请前往 Actions 手动运行一次 Scraper 机器人</p>
                             </div>
                         )}
                     </main>
