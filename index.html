@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Vision Sync | Zella</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const App = () => {
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                // 这里的 ./data.json 会读取你仓库里机器人抓取的数据
+                fetch('./data.json')
+                    .then(res => res.json())
+                    .then(json => {
+                        setData(json);
+                        setLoading(false);
+                    })
+                    .catch(err => {
+                        console.error("数据还没准备好:", err);
+                        setLoading(false);
+                    });
+            }, []);
+
+            return (
+                <div className="min-h-screen p-8">
+                    <header className="max-w-4xl mx-auto mb-12 flex justify-between items-center">
+                        <div>
+                            <h1 className="text-4xl font-black tracking-tighter text-blue-600">AI VISION SYNC</h1>
+                            <p className="text-slate-400 font-medium uppercase text-xs tracking-widest mt-1">Zella's Automated Trend Intelligence</p>
+                        </div>
+                        <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border text-[10px] font-bold">
+                            STATUS: <span className="text-green-500 underline animate-pulse">LIVE</span>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto">
+                        {loading ? (
+                            <div className="text-center py-20 text-slate-300 font-bold italic animate-pulse">CONNECTING TO CLOUD DATA...</div>
+                        ) : data.length > 0 ? (
+                            <div className="grid gap-4">
+                                {data.map((item, index) => (
+                                    <div key={index} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:scale-[1.01] transition-all flex justify-between items-center group">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="bg-slate-900 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest">{item.source}</span>
+                                                <h3 className="font-bold text-lg text-slate-800">{item.title}</h3>
+                                            </div>
+                                            <p className="text-xs text-slate-400 font-mono truncate max-w-md">{item.url || 'Internal Data Trace'}</p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <div className="text-2xl font-black text-rose-500 italic leading-none">❤️ {item.likes}</div>
+                                            <div className="text-[9px] font-black text-slate-300 uppercase tracking-tighter mt-1">High Impact</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-[3rem] p-20 text-center border-2 border-dashed border-slate-200">
+                                <p className="text-slate-400 font-bold italic mb-4">"灵感池目前是空的"</p>
+                                <p className="text-xs text-slate-300">请前往 Actions 手动运行一次 Scraper 机器人</p>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
