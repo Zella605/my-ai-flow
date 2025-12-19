@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Vision Sync 3.6 | 自动竞榜版</title>
+    <title>AI Vision Sync 5.0 | 深度灵感站</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -17,177 +17,154 @@
 
         const App = () => {
             const [view, setView] = useState('brainstorm');
-            const [ideas, setIdeas] = useState([]);
+            const [scrapedData, setScrapedData] = useState([]);
+            const [manualData, setManualData] = useState(() => {
+                const saved = localStorage.getItem('zella-manual-v5');
+                return saved ? JSON.parse(saved) : [];
+            });
             const [votes, setVotes] = useState(() => {
-                const saved = localStorage.getItem('ai-flow-votes-v3.6');
+                const saved = localStorage.getItem('zella-votes-v5');
                 return saved ? JSON.parse(saved) : {};
             });
+
+            // 手动上传表单状态
+            const [form, setForm] = useState({ url: '', img: '', note: '' });
             const [loading, setLoading] = useState(true);
 
             useEffect(() => {
-                fetch('./data.json')
-                    .then(res => res.json())
-                    .then(json => {
-                        setIdeas(json.map(item => ({
-                            ...item,
-                            status: item.status || 'pending',
-                            type: item.type || 'hotspot'
-                        })));
-                        setLoading(false);
-                    })
-                    .catch(err => {
-                        console.error("Data load failed", err);
-                        setLoading(false);
-                    });
+                fetch('./data.json').then(res => res.json()).then(json => {
+                    setScrapedData(json);
+                    setLoading(false);
+                }).catch(() => setLoading(false));
             }, []);
 
             useEffect(() => {
-                localStorage.setItem('ai-flow-votes-v3.6', JSON.stringify(votes));
-            }, [votes]);
+                localStorage.setItem('zella-manual-v5', JSON.stringify(manualData));
+                localStorage.setItem('zella-votes-v5', JSON.stringify(votes));
+            }, [manualData, votes]);
 
-            // 🗳️ 投票逻辑
-            const handleVote = (id, e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setVotes(prev => ({
-                    ...prev,
-                    [id]: (prev[id] || 0) + 1
-                }));
+            const handleAddLink = () => {
+                if (!form.url) return;
+                const newIdea = {
+                    id: `manual-${Date.now()}`,
+                    title: `手动捕获灵感`,
+                    likes: "NEW",
+                    source: "MANUAL",
+                    url: form.url,
+                    imageUrl: form.img || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400",
+                    note: form.note || "暂无深度说明",
+                    status: 'pending'
+                };
+                setManualData([newIdea, ...manualData]);
+                setForm({ url: '', img: '', note: '' });
             };
 
-            const toggleApprove = (id, e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setIdeas(ideas.map(i => i.id === id ? { ...i, status: i.status === 'approved' ? 'pending' : 'approved' } : i));
+            const handleVote = (id) => {
+                setVotes(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
             };
 
-            // 🚀 核心逻辑：根据投票数进行自动排序
-            const sortedIdeas = useMemo(() => {
-                return [...ideas].sort((a, b) => {
-                    const votesA = votes[a.id] || 0;
-                    const votesB = votes[b.id] || 0;
-                    // 如果票数相同，则保持原始抓取顺序
-                    return votesB - votesA;
-                });
-            }, [ideas, votes]);
-
-            const maxVotes = Math.max(...Object.values(votes), 0);
-            const dailyItems = ideas.filter(i => i.status === 'approved' && i.type === 'longterm');
-            const hotItems = ideas.filter(i => i.status === 'approved' && i.type === 'hotspot');
+            const allIdeas = useMemo(() => {
+                return [...manualData, ...scrapedData].sort((a, b) => (votes[b.id] || 0) - (votes[a.id] || 0));
+            }, [scrapedData, manualData, votes]);
 
             return (
-                <div className="min-h-screen pb-10">
-                    <nav className="bg-white/90 backdrop-blur-md border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-indigo-600 text-white p-1 rounded font-black text-[10px] w-12 text-center shadow-lg shadow-indigo-100">AI</div>
-                            <span className="font-black text-slate-800 tracking-tighter uppercase text-sm">Vision Sync 3.6</span>
+                <div className="min-h-screen pb-20">
+                    <nav className="bg-white/80 backdrop-blur-xl border-b px-8 py-4 flex justify-between items-center sticky top-0 z-50">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-indigo-600 text-white px-2 py-1 rounded-lg font-black text-xs shadow-lg shadow-indigo-200">ZELLA v5</div>
+                            <h1 className="font-black text-slate-800 tracking-tighter uppercase">AI Vision Sync</h1>
                         </div>
-                        <div className="bg-slate-100 rounded-full p-1 flex">
-                            <button onClick={() => setView('brainstorm')} className={`px-6 py-1.5 rounded-full text-[11px] font-black transition-all ${view === 'brainstorm' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>热力灵感池</button>
-                            <button onClick={() => setView('roadmap')} className={`px-6 py-1.5 rounded-full text-[11px] font-black transition-all ${view === 'roadmap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>执行看板</button>
+                        <div className="bg-slate-100 rounded-2xl p-1 flex">
+                            <button onClick={() => setView('brainstorm')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${view === 'brainstorm' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>灵感池</button>
+                            <button onClick={() => setView('roadmap')} className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${view === 'roadmap' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>排期看板</button>
                         </div>
                     </nav>
 
-                    <main className="max-w-4xl mx-auto mt-8 px-4">
+                    <main className="max-w-5xl mx-auto mt-10 px-6">
                         {view === 'brainstorm' ? (
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                                <div className="mb-8 flex justify-between items-end">
-                                    <div>
-                                        <h2 className="font-black text-3xl text-slate-900 tracking-tight flex items-center gap-2">
-                                            Trending Ideas <span className="animate-bounce">🚀</span>
-                                        </h2>
-                                        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">投票最高项已自动置顶，决定我们的研发优先级</p>
+                            <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
+                                
+                                {/* 深度上传表单 */}
+                                <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 mb-12 shadow-sm relative overflow-hidden">
+                                    <h3 className="font-black text-slate-800 text-lg mb-6 flex items-center gap-2">
+                                        <span className="text-2xl text-indigo-500">+</span> 新增深度灵感录入
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-4">
+                                            <input 
+                                                value={form.url} 
+                                                onChange={e => setForm({...form, url: e.target.value})}
+                                                placeholder="粘贴原始链接 (TikTok/小红书...)"
+                                                className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm focus:ring-2 ring-indigo-500 transition-all"
+                                            />
+                                            <input 
+                                                value={form.img} 
+                                                onChange={e => setForm({...form, img: e.target.value})}
+                                                placeholder="图片地址 (可右键复制网页图片地址)"
+                                                className="w-full bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm focus:ring-2 ring-indigo-500 transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-4">
+                                            <textarea 
+                                                value={form.note} 
+                                                onChange={e => setForm({...form, note: e.target.value})}
+                                                placeholder="在此输入灵感说明：例如「粒子消散特效，适合美妆类目」"
+                                                className="w-full h-full min-h-[110px] bg-slate-50 border-none rounded-2xl px-5 py-3.5 text-sm focus:ring-2 ring-indigo-500 transition-all resize-none"
+                                            />
+                                        </div>
                                     </div>
+                                    <button 
+                                        onClick={handleAddLink}
+                                        className="w-full mt-6 bg-slate-900 text-white py-4 rounded-2xl font-black text-sm hover:bg-indigo-600 transition-all active:scale-[0.98] shadow-xl shadow-slate-200"
+                                    >
+                                        提交并同步至灵感池
+                                    </button>
                                 </div>
 
-                                <div className="space-y-4">
-                                    {loading ? (
-                                        <div className="py-20 text-center text-slate-300 font-black italic animate-pulse tracking-widest uppercase">Sorting by Popularity...</div>
-                                    ) : sortedIdeas.map((item, index) => {
-                                        const itemVotes = votes[item.id] || 0;
-                                        const isFirst = index === 0 && itemVotes > 0;
-                                        
-                                        return (
-                                            <div key={item.id} className={`bg-white border rounded-[2.5rem] p-4 flex items-center gap-5 transition-all duration-500 group relative ${isFirst ? 'border-indigo-200 ring-8 ring-indigo-50/50 shadow-2xl scale-[1.02] z-10' : 'border-slate-100 shadow-sm'}`}>
-                                                
-                                                {/* 排位序号 */}
-                                                <div className={`absolute -left-3 w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shadow-md border ${isFirst ? 'bg-indigo-600 text-white border-indigo-400' : 'bg-white text-slate-300 border-slate-100'}`}>
-                                                    {index + 1}
+                                {/* 卡片瀑布流 */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {allIdeas.map((item, index) => (
+                                        <div key={item.id} className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden hover:shadow-2xl transition-all group flex flex-col shadow-sm border-b-4 border-b-slate-200 hover:border-b-indigo-500">
+                                            {/* 图片封面 */}
+                                            <div className="h-64 overflow-hidden relative">
+                                                <img src={item.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm text-[9px] font-black uppercase tracking-widest">
+                                                    #{index + 1} {item.source}
                                                 </div>
-
-                                                <a href={item.url} target="_blank" className="w-24 h-24 rounded-3xl overflow-hidden shrink-0 bg-slate-100 block relative">
-                                                    <img src={item.imageUrl || `https://picsum.photos/seed/${item.id}/300/300`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
-                                                        <span className="text-white text-[8px] font-black tracking-widest uppercase">Open ↗</span>
-                                                    </div>
+                                                <a href={item.url} target="_blank" className="absolute top-4 right-4 bg-black/50 hover:bg-black text-white p-2 rounded-full backdrop-blur opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    ↗
                                                 </a>
+                                            </div>
 
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-[9px] bg-indigo-50 text-indigo-500 px-2 py-0.5 rounded-full font-black uppercase">{item.source}</span>
-                                                        <h4 className="font-black text-slate-800 truncate text-lg tracking-tight group-hover:text-indigo-600 transition-colors">{item.title}</h4>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 text-xs font-bold">
-                                                        <span className="text-rose-500 flex items-center gap-1">❤️ <span className="text-slate-400 font-mono text-[10px] uppercase tracking-tighter">Global:</span> {item.likes}</span>
-                                                        <div className="h-1 w-1 bg-slate-200 rounded-full"></div>
-                                                        <span className="text-indigo-600 uppercase tracking-widest text-[10px]">内部投票: {itemVotes}</span>
+                                            {/* 内容区 */}
+                                            <div className="p-6 flex-1 flex flex-col justify-between">
+                                                <div>
+                                                    <h4 className="font-black text-slate-800 text-lg mb-2 line-clamp-1">{item.title}</h4>
+                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-4">
+                                                        <p className="text-slate-500 text-xs font-bold leading-relaxed italic">
+                                                            “ {item.note || "该灵感目前由机器人自动抓取，暂无深度说明内容。"} ”
+                                                        </p>
                                                     </div>
                                                 </div>
-
-                                                <div className="shrink-0 flex items-center gap-2">
+                                                
+                                                <div className="flex justify-between items-center mt-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-rose-500 text-xs font-black tracking-tighter">LIKES: {item.likes}</span>
+                                                    </div>
                                                     <button 
-                                                        onClick={(e) => handleVote(item.id, e)}
-                                                        className="flex flex-col items-center justify-center w-16 h-16 rounded-[1.5rem] bg-slate-50 text-slate-400 hover:bg-indigo-600 hover:text-white transition-all active:scale-90 group/vote relative overflow-hidden"
+                                                        onClick={() => handleVote(item.id)}
+                                                        className="bg-indigo-50 text-indigo-600 px-6 py-2.5 rounded-xl font-black text-xs hover:bg-indigo-600 hover:text-white transition-all active:scale-90 flex items-center gap-2"
                                                     >
-                                                        <span className="text-xl relative z-10 group-hover/vote:scale-125 transition-transform duration-300">👍</span>
-                                                        <span className="text-[10px] font-black relative z-10 mt-1">{itemVotes}</span>
-                                                        <div className="absolute inset-0 bg-indigo-500 opacity-0 group-hover/vote:opacity-100 transition-opacity"></div>
-                                                    </button>
-
-                                                    <button 
-                                                        onClick={(e) => toggleApprove(item.id, e)}
-                                                        className={`h-16 px-6 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${item.status === 'approved' ? 'bg-green-500 text-white' : 'bg-slate-900 text-white hover:bg-slate-700 shadow-lg shadow-slate-200'}`}
-                                                    >
-                                                        {item.status === 'approved' ? 'Done' : 'Approve'}
+                                                        🔥 投一票 <span className="bg-white/20 px-1.5 rounded">{votes[item.id] || 0}</span>
                                                     </button>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         ) : (
-                            <div className="animate-in slide-in-from-right-4 duration-500">
-                                {/* 执行看板逻辑 - 保持精简 */}
-                                <div className="grid grid-cols-2 gap-4 mb-8">
-                                    <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm text-center">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Daily Quota</div>
-                                        <div className="text-4xl font-black text-indigo-600">{dailyItems.length}/3</div>
-                                    </div>
-                                    <div className="bg-slate-900 p-6 rounded-[2rem] shadow-xl text-center">
-                                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Hotspots</div>
-                                        <div className="text-4xl font-black text-orange-400">{hotItems.length}</div>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
-                                    <div className="p-6 border-b font-black text-slate-800 text-sm uppercase italic tracking-tighter">Current Pipeline</div>
-                                    <div className="divide-y divide-slate-50">
-                                        {[...dailyItems, ...hotItems].map(item => (
-                                            <div key={item.id} className="p-6 flex justify-between items-center group hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="text-xs font-black text-indigo-600 w-8">#{votes[item.id] || 0}</div>
-                                                    <span className="font-bold text-slate-800">{item.title}</span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase">In Production</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
+                            <div className="text-center py-40 font-black text-slate-200 text-6xl italic uppercase opacity-20 select-none">Under Construction</div>
                         )}
                     </main>
                 </div>
